@@ -8,6 +8,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import DarkModeSwitcher from './DarkModeSwitcher';
 
 const Header = ({ onMenuClick }) => {
     const { t } = useTranslation();
@@ -53,10 +54,13 @@ const Header = ({ onMenuClick }) => {
             position="sticky"
             elevation={trigger ? 4 : 0}
             sx={{
-                bgcolor: trigger ? 'rgba(255, 255, 255, 0.9)' : 'white',
+                bgcolor: (theme) => trigger
+                    ? (theme.palette.mode === 'dark' ? 'rgba(16, 32, 49, 0.9)' : 'rgba(255, 255, 255, 0.9)')
+                    : 'background.paper',
                 backdropFilter: trigger ? 'blur(8px)' : 'none',
-                color: 'primary.main',
-                borderBottom: trigger ? 'none' : '1px solid #edf2f7',
+                color: 'text.primary',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
                 transition: 'all 0.3s ease',
                 zIndex: 1100
             }}
@@ -114,6 +118,8 @@ const Header = ({ onMenuClick }) => {
                             </Tooltip>
                         )}
 
+                        <DarkModeSwitcher />
+
                         {isAgentDashboard && (
                             <Button
                                 variant="contained"
@@ -133,7 +139,7 @@ const Header = ({ onMenuClick }) => {
                                 color: 'text.primary',
                                 fontWeight: 600,
                                 borderRadius: 2,
-                                '&:hover': { bgcolor: '#f1f5f9' }
+                                '&:hover': { bgcolor: 'action.hover' }
                             }}
                         >
                             {languages.find(l => l.code === language)?.label || t('common.language')}

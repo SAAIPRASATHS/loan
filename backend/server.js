@@ -1,14 +1,16 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const connectDB = require('./config/database');
-const path = require('path');
+const prisma = require('./prisma/client');
 
 // Load environment variables
 dotenv.config();
 
 // Connect to Database
-connectDB().catch(err => console.error('Database pre-connect failed:', err));
+prisma.$connect()
+    .then(() => console.log('PostgreSQL (Neon) connected via Prisma'))
+    .catch(err => console.error('Database connection failed:', err));
 
 const app = express();
 

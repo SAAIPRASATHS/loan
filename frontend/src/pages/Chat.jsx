@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
-const Message = ({ content, role, isVoice, onAcceptOffer }) => {
+const Message = ({ content, role, isVoice, onAcceptOffer, onSuggestionClick }) => {
     const { t, i18n } = useTranslation();
     const [translatedContent, setTranslatedContent] = useState('');
     const [isTranslating, setIsTranslating] = useState(false);
@@ -18,13 +18,17 @@ const Message = ({ content, role, isVoice, onAcceptOffer }) => {
     const isAssistant = role === 'assistant';
     const offerMatch = content.match(/\[\[LOAN_OFFER:(.*?)\]\]/);
     const dataMatch = content.match(/\[\[LOAN_DATA:(.*?)\]\]/);
-    const eligibilityMatch = content.match(/\[\[ELIGIBILITY_RESULT\s*:\s*(.*?)\s*:\s*(.*?)(?:\s*:\s*(.*?))?\s*\]\]/);
+    const eligibilityMatch = content.match(/\[\[ELIGIBILITY_RESULT\s*:\s*([^:\s]*)\s*:\s*([^:\s\]]*)(?:\s*:\s*([^:\s\]]*))?\s*\]\]/i);
+    const suggestionsMatch = content.match(/\[\[SUGGESTIONS:(.*?)\]\]/);
 
     const displayContent = content
-        .replace(/\[\[LOAN_OFFER:.*?\]\]/, '')
-        .replace(/\[\[LOAN_DATA:.*?\]\]/, '')
-        .replace(/\[\[ELIGIBILITY_RESULT:.*?\]\]/, '')
+        .replace(/\[\[LOAN_OFFER:.*?\]\]/g, '')
+        .replace(/\[\[LOAN_DATA:.*?\]\]/g, '')
+        .replace(/\[\[ELIGIBILITY_RESULT\s*:.*?\]\]/gi, '')
+        .replace(/\[\[SUGGESTIONS:.*?\]\]/g, '')
         .trim();
+
+    const suggestions = suggestionsMatch ? suggestionsMatch[1].split('|') : [];
 
     const loanId = offerMatch ? offerMatch[1] : null;
     let loanData = null;
@@ -34,11 +38,14 @@ const Message = ({ content, role, isVoice, onAcceptOffer }) => {
         console.error("Failed to parse loan data", e);
     }
 
-    const eligibilityStatus = eligibilityMatch ? eligibilityMatch[1] : null;
-    const eligibilityValue = eligibilityMatch ? eligibilityMatch[2] : null;
+    const eligibilityStatus = eligibilityMatch ? eligibilityMatch[1].trim().toLowerCase() : null;
+    const eligibilityValue = eligibilityMatch ? eligibilityMatch[2].trim() : null;
+
 
     const handleTranslate = async (targetLangInput = null) => {
         let targetLang = targetLangInput;
+        console.log('[TRANSLATE] Button clicked, targetLang:', targetLang);
+
         if (!targetLang) {
             // Cycle through: en → hi → ta → en
             if (i18n.language === 'en') targetLang = 'hi';
@@ -46,26 +53,33 @@ const Message = ({ content, role, isVoice, onAcceptOffer }) => {
             else targetLang = 'en';
         }
 
+        console.log('[TRANSLATE] Final targetLang:', targetLang, 'Current translation:', translatedContent);
+
         if (showTranslation && translatedContent && translatedContent.lang === targetLang) {
+            console.log('[TRANSLATE] Hiding translation');
             setShowTranslation(false);
             return;
         }
 
         if (translatedContent && translatedContent.lang === targetLang) {
+            console.log('[TRANSLATE] Showing cached translation');
             setShowTranslation(true);
             return;
         }
 
         setIsTranslating(true);
+        console.log('[TRANSLATE] Calling API with text:', displayContent.substring(0, 50));
         try {
             const { data } = await api.post('/chat/translate', {
                 text: displayContent,
                 targetLang: targetLang
             });
+            console.log('[TRANSLATE] API response:', data);
             setTranslatedContent({ text: data.translatedText, lang: targetLang });
             setShowTranslation(true);
         } catch (err) {
-            console.error('Translation failed', err);
+            console.error('[TRANSLATE] API error:', err);
+            console.error('[TRANSLATE] Error response:', err.response?.data);
             alert("Translation failed. Please try again.");
         } finally {
             setIsTranslating(false);
@@ -88,9 +102,10 @@ const Message = ({ content, role, isVoice, onAcceptOffer }) => {
                         sx={{
                             p: 2,
                             borderRadius: isAssistant ? '20px 20px 20px 4px' : '20px 20px 4px 20px',
-                            bgcolor: isAssistant ? 'white' : 'primary.main',
+                            bgcolor: isAssistant ? 'background.paper' : 'primary.main',
                             color: isAssistant ? 'text.primary' : 'white',
-                            border: isAssistant ? '1px solid #e0e0e0' : 'none',
+                            border: isAssistant ? '1px solid' : 'none',
+                            borderColor: 'divider',
                             position: 'relative'
                         }}
                     >
@@ -105,7 +120,7 @@ const Message = ({ content, role, isVoice, onAcceptOffer }) => {
                                     variant="contained"
                                     color="success"
                                     size="small"
-                                    sx={{ mt: 1, bgcolor: 'white', color: 'success.main', '&:hover': { bgcolor: '#f0f0f0' } }}
+                                    sx={{ mt: 1, bgcolor: 'background.paper', color: 'success.main', '&:hover': { bgcolor: 'action.hover' } }}
                                     onClick={() => onAcceptOffer(eligibilityValue, loanData)}
                                 >
                                     {t('chat.accept_apply')}
@@ -131,6 +146,30 @@ const Message = ({ content, role, isVoice, onAcceptOffer }) => {
                                 {t('chat.accept_apply')}
                             </Button>
                         )}
+                        {suggestions.length > 0 && (
+                            <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {suggestions.map((suggestion, idx) => (
+                                    <Button
+                                        key={idx}
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => onSuggestionClick(suggestion)}
+                                        sx={{
+                                            borderRadius: 4,
+                                            textTransform: 'none',
+                                            borderColor: isAssistant ? 'primary.main' : 'rgba(255,255,255,0.5)',
+                                            color: isAssistant ? 'primary.main' : 'white',
+                                            '&:hover': {
+                                                bgcolor: isAssistant ? 'primary.light' : 'rgba(255,255,255,0.1)',
+                                                borderColor: isAssistant ? 'primary.main' : 'white',
+                                            }
+                                        }}
+                                    >
+                                        {suggestion}
+                                    </Button>
+                                ))}
+                            </Box>
+                        )}
                     </Paper>
 
                     <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
@@ -140,7 +179,7 @@ const Message = ({ content, role, isVoice, onAcceptOffer }) => {
                             disabled={isTranslating}
                             sx={{
                                 opacity: 0.6,
-                                '&:hover': { opacity: 1, bgcolor: 'rgba(0,0,0,0.05)' },
+                                '&:hover': { opacity: 1, bgcolor: 'action.hover' },
                                 color: (showTranslation && translatedContent && translatedContent.lang !== 'en') ? 'primary.main' : 'inherit'
                             }}
                             title="Translate"
@@ -380,7 +419,7 @@ const Chat = () => {
     };
 
     return (
-        <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', bgcolor: '#f0f2f5' }}>
+        <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
             {/* Messages Area */}
             <Box sx={{ flexGrow: 1, overflowY: 'auto', py: 4 }}>
                 <Container maxWidth="md">
@@ -394,7 +433,12 @@ const Chat = () => {
                         </Box>
                     )}
                     {messages.map((msg, index) => (
-                        <Message key={index} {...msg} onAcceptOffer={handleAcceptOffer} />
+                        <Message
+                            key={index}
+                            {...msg}
+                            onAcceptOffer={handleAcceptOffer}
+                            onSuggestionClick={(text) => handleSend(text)}
+                        />
                     ))}
                     {loading && (
                         <Typography variant="caption" sx={{ ml: 6, fontStyle: 'italic', opacity: 0.7 }}>
@@ -406,7 +450,7 @@ const Chat = () => {
             </Box>
 
             {/* Input Area */}
-            <Paper elevation={4} square sx={{ p: 2, borderTop: '1px solid #ddd' }}>
+            <Paper elevation={4} square sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
                 <Container maxWidth="md">
                     <Stack direction="row" spacing={2}>
                         <IconButton

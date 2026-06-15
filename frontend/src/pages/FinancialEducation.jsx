@@ -4,11 +4,18 @@ import { ChevronDown, Book, PiggyBank, Scale, Calculator } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const EducationItem = ({ icon: Icon, title, content }) => (
-    <Paper sx={{ p: 4, height: '100%', borderRadius: 4, border: '1px solid #eee' }} elevation={0}>
-        <Box sx={{ color: 'primary.main', mb: 2 }}>
+    <Paper sx={{
+        p: 4,
+        height: '100%',
+        borderRadius: 4,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper'
+    }} elevation={0}>
+        <Box sx={{ color: 'primary.light', mb: 2 }}>
             <Icon size={32} />
         </Box>
-        <Typography variant="h6" fontWeight="700" gutterBottom>{title}</Typography>
+        <Typography variant="h6" fontWeight="700" gutterBottom color="text.primary">{title}</Typography>
         <Typography variant="body2" color="text.secondary">{content}</Typography>
     </Paper>
 );
@@ -19,7 +26,7 @@ const FinancialEducation = () => {
     return (
         <Container maxWidth="lg" sx={{ py: 8 }}>
             <Box sx={{ mb: 8, textAlign: 'center' }}>
-                <Typography variant="h3" fontWeight="900" gutterBottom color="primary">
+                <Typography variant="h4" fontWeight={900} gutterBottom sx={{ color: 'text.primary', mb: 4 }}>
                     {t('education.title')}
                 </Typography>
                 <Typography variant="h6" color="text.secondary" maxWidth="md" sx={{ mx: 'auto' }}>
@@ -60,7 +67,7 @@ const FinancialEducation = () => {
 
             <Typography variant="h5" fontWeight="800" sx={{ mb: 4 }}>{t('education.faq_title')}</Typography>
             <Box>
-                <Accordion elevation={0} sx={{ border: '1px solid #eee', mb: 1, borderRadius: '12px !important' }}>
+                <Accordion elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 1, borderRadius: '12px !important', bgcolor: 'background.paper' }}>
                     <AccordionSummary expandIcon={<ChevronDown />}>
                         <Typography variant="subtitle1" fontWeight="600">{t('education.q1')}</Typography>
                     </AccordionSummary>
@@ -70,7 +77,7 @@ const FinancialEducation = () => {
                         </Typography>
                     </AccordionDetails>
                 </Accordion>
-                <Accordion elevation={0} sx={{ border: '1px solid #eee', mb: 1, borderRadius: '12px !important' }}>
+                <Accordion elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 1, borderRadius: '12px !important', bgcolor: 'background.paper' }}>
                     <AccordionSummary expandIcon={<ChevronDown />}>
                         <Typography variant="subtitle1" fontWeight="600">{t('education.q2')}</Typography>
                     </AccordionSummary>

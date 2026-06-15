@@ -1,11 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
-const LoanApplication = require('../models/LoanApplication');
-const Loan = require('../models/Loan');
+const prisma = require('../prisma/client');
 const { sendLoanApprovalEmail } = require('../services/emailService');
-
-
 const { protect } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
@@ -28,10 +24,9 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
-        cb(null, `${req.user._id}-${Date.now()}${path.extname(file.originalname)}`);
+        cb(null, `${req.user.id}-${Date.now()}${path.extname(file.originalname)}`);
     }
 });
-
 
 const upload = multer({ storage: storage });
 
@@ -43,39 +38,37 @@ router.post('/', protect, async (req, res) => {
         const {
             loanId, requestedAmount, requestedTenure, purpose,
             borrowerAge, monthlyIncome, creditScore,
-            hasCollateral, collateralDetails, requirementsMet
+            hasCollateral, collateralDetails, requirementsMet,
+            aadharNumber
         } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(loanId)) {
-            return res.status(400).json({ message: 'Invalid Loan ID format' });
-        }
-
         // Fetch loan details for validation
-        const loanData = await Loan.findById(loanId);
+        const loanData = await prisma.loan.findUnique({ where: { id: loanId } });
         if (!loanData) {
             return res.status(404).json({ message: 'Loan product not found' });
         }
 
         // Calculate eligibility for agent reference (NO auto-approval)
-        const crit = loanData.eligibilityCriteria;
-        const ageValid = borrowerAge >= crit.minAge && (crit.maxAge ? borrowerAge <= crit.maxAge : true);
-        const incomeValid = monthlyIncome >= crit.minIncome;
-        const creditValid = creditScore >= (crit.minCreditScore || 0);
+        const ageValid = borrowerAge >= loanData.minAge && borrowerAge <= loanData.maxAge;
+        const incomeValid = monthlyIncome >= loanData.minIncome;
+        const creditValid = creditScore >= loanData.minCreditScore;
 
-        const application = await LoanApplication.create({
-            user: req.user._id,
-            loan: loanId,
-            requestedAmount,
-            requestedTenure,
-            purpose,
-            borrowerAge,
-            monthlyIncome,
-            creditScore,
-            hasCollateral,
-            collateralDetails,
-            requirementsMet,
-            status: 'submitted', // Always submitted — agent must review
-            eligibilityDetails: {
+        const application = await prisma.loanApplication.create({
+            data: {
+                userId: req.user.id,
+                loanId: loanId,
+                requestedAmount,
+                requestedTenure,
+                purpose,
+                borrowerAge,
+                monthlyIncome,
+                creditScore,
+                hasCollateral: hasCollateral || false,
+                collateralDetails,
+                aadharNumber,
+                status: 'submitted', // Always submitted — agent must review
+                
+                // Mapped to specific flattened schema columns
                 ageEligible: ageValid,
                 incomeEligible: incomeValid,
                 creditScoreEligible: creditValid,
@@ -96,8 +89,18 @@ router.post('/', protect, async (req, res) => {
 // @access  Private
 router.get('/my-applications', protect, async (req, res) => {
     try {
-        const applications = await LoanApplication.find({ user: req.user._id })
-            .populate('loan', 'name loanType interestRate');
+        const applications = await prisma.loanApplication.findMany({
+            where: { userId: req.user.id },
+            include: {
+                loan: {
+                    select: {
+                        nameEn: true,
+                        loanType: true,
+                        interestRateMin: true
+                    }
+                }
+            }
+        });
         res.json(applications);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -108,32 +111,35 @@ router.get('/my-applications', protect, async (req, res) => {
 // @route   POST /api/applications/:id/upload
 // @access  Private
 router.post('/:id/upload', protect, upload.single('document'), async (req, res) => {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ message: 'Invalid Application ID format' });
-    }
     try {
-        const application = await LoanApplication.findOne({
-            _id: req.params.id,
-            user: req.user._id
+        const application = await prisma.loanApplication.findUnique({
+            where: { id: req.params.id }
         });
 
-        if (!application) {
-            return res.status(404).json({ message: 'Application not found' });
+        if (!application || application.userId !== req.user.id) {
+            return res.status(404).json({ message: 'Application not found or unauthorized' });
         }
 
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        application.documents.push({
+        const newDoc = {
             documentType: req.body.documentType,
             fileName: req.file.filename,
-            filePath: req.file.path
+            filePath: req.file.path,
+            uploadedAt: new Date().toISOString()
+        };
+
+        const existingDocs = application.documents ? application.documents : [];
+        const updatedDocs = [...existingDocs, newDoc];
+
+        const updatedApplication = await prisma.loanApplication.update({
+            where: { id: application.id },
+            data: { documents: updatedDocs }
         });
 
-
-        await application.save();
-        res.json(application);
+        res.json(updatedApplication);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -144,30 +150,21 @@ router.post('/:id/upload', protect, upload.single('document'), async (req, res) 
 // @access  Private
 router.delete('/:id', protect, async (req, res) => {
     try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: 'Invalid Application ID format' });
-        }
-
-        const application = await LoanApplication.findById(req.params.id);
+        const application = await prisma.loanApplication.findUnique({ where: { id: req.params.id } });
 
         if (!application) {
             return res.status(404).json({ message: 'Application not found' });
         }
 
-        // Check if user is authorized:
-        // 1. User is the borrower who created it
-        // 2. User is the assigned agent
-        // 3. User is an agent and the lead is unassigned (visible in dashboard)
-        // 4. User is an admin
-        const isOwner = application.user.toString() === req.user._id.toString();
-        const isAgent = application.agent && application.agent.toString() === req.user._id.toString();
-        const isUnassignedAgent = req.user.role === 'agent' && !application.agent;
+        const isOwner = application.userId === req.user.id;
+        const isAgent = application.agentId === req.user.id;
+        const isUnassignedAgent = req.user.role === 'agent' && !application.agentId;
 
         if (!isOwner && !isAgent && !isUnassignedAgent && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized to delete this application' });
         }
 
-        await LoanApplication.findByIdAndDelete(req.params.id);
+        await prisma.loanApplication.delete({ where: { id: req.params.id } });
 
         res.json({ message: 'Application removed successfully' });
     } catch (error) {

@@ -1,10 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
+const prisma = require('../prisma/client');
 const { protect } = require('../middleware/auth');
-const User = require('../models/User');
-const AgentProfile = require('../models/AgentProfile');
-const LoanApplication = require('../models/LoanApplication');
 
 // @desc    Get agent dashboard stats
 // @route   GET /api/agents/dashboard
@@ -15,20 +12,23 @@ router.get('/dashboard', protect, async (req, res) => {
             return res.status(403).json({ message: 'Access denied. Agent/Admin role required.' });
         }
 
-        const agentProfile = await AgentProfile.findOne({ user: req.user._id });
+        const agentProfile = await prisma.agentProfile.findUnique({ where: { userId: req.user.id } });
 
         // Admin sees all leads, Agent sees theirs + unassigned
         const query = req.user.role === 'admin' ? {} : {
-            $or: [
-                { agent: req.user._id },
-                { agent: { $exists: false } },
-                { agent: null }
+            OR: [
+                { agentId: req.user.id },
+                { agentId: null }
             ]
         };
 
-        const leads = await LoanApplication.find(query)
-            .populate('user', 'name email phone')
-            .populate('loan', 'name loanType');
+        const leads = await prisma.loanApplication.findMany({
+            where: query,
+            include: {
+                user: { select: { name: true, email: true, phone: true } },
+                loan: { select: { nameEn: true, loanType: true } }
+            }
+        });
 
         res.json({
             profile: agentProfile,
@@ -36,7 +36,7 @@ router.get('/dashboard', protect, async (req, res) => {
             stats: {
                 totalLeads: leads.length,
                 approvedLeads: leads.filter(l => l.status === 'approved').length,
-                pendingLeads: leads.filter(l => ['submitted', 'under-review'].includes(l.status)).length
+                pendingLeads: leads.filter(l => ['submitted', 'under_review'].includes(l.status)).length
             }
         });
     } catch (error) {
@@ -55,29 +55,24 @@ router.post('/leads', protect, async (req, res) => {
 
         const { borrowerId, loanId, requestedAmount, requestedTenure, purpose } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(borrowerId)) {
-            return res.status(400).json({ message: 'Invalid Borrower ID format' });
-        }
-        if (!mongoose.Types.ObjectId.isValid(loanId)) {
-            return res.status(400).json({ message: 'Invalid Loan ID format' });
-        }
-
-        const application = await LoanApplication.create({
-            user: borrowerId,
-            loan: loanId,
-            agent: req.user._id,
-            isAgentSubmission: true,
-            requestedAmount,
-            requestedTenure,
-            purpose,
-            status: 'submitted'
+        const application = await prisma.loanApplication.create({
+            data: {
+                userId: borrowerId,
+                loanId: loanId,
+                agentId: req.user.id,
+                isAgentSubmission: true,
+                requestedAmount,
+                requestedTenure,
+                purpose,
+                status: 'submitted'
+            }
         });
 
         // Update agent stats
-        await AgentProfile.findOneAndUpdate(
-            { user: req.user._id },
-            { $inc: { totalLeadsSubmitted: 1 } }
-        );
+        await prisma.agentProfile.update({
+            where: { userId: req.user.id },
+            data: { totalLeadsSubmitted: { increment: 1 } }
+        });
 
         res.status(201).json(application);
     } catch (error) {
@@ -96,17 +91,19 @@ router.post('/profile', protect, async (req, res) => {
 
         const { agencyName, licenseNumber, experience, specializations } = req.body;
 
-        const profileExists = await AgentProfile.findOne({ user: req.user._id });
+        const profileExists = await prisma.agentProfile.findUnique({ where: { userId: req.user.id } });
         if (profileExists) {
             return res.status(400).json({ message: 'Agent profile already exists' });
         }
 
-        const agentProfile = await AgentProfile.create({
-            user: req.user._id,
-            agencyName,
-            licenseNumber,
-            experience,
-            specializations
+        const agentProfile = await prisma.agentProfile.create({
+            data: {
+                userId: req.user.id,
+                agencyName,
+                licenseNumber,
+                experience,
+                specializations
+            }
         });
 
         res.status(201).json(agentProfile);
@@ -123,14 +120,15 @@ router.get('/leads/:id', protect, async (req, res) => {
         if (req.user.role !== 'agent' && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Access denied. Agent or Admin role required.' });
         }
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: 'Invalid Application ID format' });
-        }
 
-        const application = await LoanApplication.findById(req.params.id)
-            .populate('user', 'name email phone financialProfile')
-            .populate('loan', 'name loanType interestRate loanAmount tenure eligibilityCriteria')
-            .populate('reviewedBy', 'name email');
+        const application = await prisma.loanApplication.findUnique({
+            where: { id: req.params.id },
+            include: {
+                user: { select: { name: true, email: true, phone: true, monthlyIncome: true, employmentStatus: true, creditScore: true } },
+                loan: true,
+                reviewedBy: { select: { name: true, email: true } }
+            }
+        });
 
         if (!application) {
             return res.status(404).json({ message: 'Application not found' });
@@ -150,9 +148,6 @@ router.put('/leads/:id/review', protect, async (req, res) => {
         if (req.user.role !== 'agent' && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Access denied. Agent or Admin role required.' });
         }
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: 'Invalid Application ID format' });
-        }
 
         const { action, remarks, approvedAmount, interestRate } = req.body;
 
@@ -160,9 +155,10 @@ router.put('/leads/:id/review', protect, async (req, res) => {
             return res.status(400).json({ message: 'Action must be "approve" or "reject"' });
         }
 
-        const application = await LoanApplication.findById(req.params.id)
-            .populate('user', 'name email')
-            .populate('loan', 'name loanType');
+        const application = await prisma.loanApplication.findUnique({
+            where: { id: req.params.id },
+            include: { user: true, loan: true }
+        });
 
         if (!application) {
             return res.status(404).json({ message: 'Application not found' });
@@ -172,35 +168,38 @@ router.put('/leads/:id/review', protect, async (req, res) => {
             return res.status(400).json({ message: `Application already ${application.status}` });
         }
 
-        application.status = action === 'approve' ? 'approved' : 'rejected';
-        application.reviewedBy = req.user._id;
-        application.reviewedAt = new Date();
-        application.agent = req.user._id;
+        const updateData = {
+            status: action === 'approve' ? 'approved' : 'rejected',
+            reviewedById: req.user.id,
+            reviewedAt: new Date(),
+            agentId: req.user.id
+        };
 
         if (action === 'approve') {
-            application.approvedAmount = approvedAmount || application.requestedAmount;
-            application.interestRate = interestRate || null;
+            updateData.approvedAmount = approvedAmount || application.requestedAmount;
+            updateData.interestRate = interestRate || null;
         } else {
-            application.rejectionReason = remarks || 'Application rejected by agent';
+            updateData.rejectionReason = remarks || 'Application rejected by agent';
         }
 
         if (remarks) {
-            application.remarks.push({
-                message: remarks,
-                createdBy: req.user.name || 'Agent',
-                createdAt: new Date()
-            });
+            const existingRemarks = application.remarks || [];
+            updateData.remarks = [
+                ...existingRemarks,
+                { message: remarks, createdBy: req.user.name || 'Agent', createdAt: new Date() }
+            ];
         }
 
-        await application.save();
+        const updatedApplication = await prisma.loanApplication.update({
+            where: { id: application.id },
+            data: updateData
+        });
 
         // Send email notification
         try {
-            const Loan = require('../models/Loan');
-            const loanData = await Loan.findById(application.loan);
             if (action === 'approve') {
                 const { sendLoanApprovalEmail } = require('../services/emailService');
-                sendLoanApprovalEmail(application, application.user, loanData);
+                sendLoanApprovalEmail(updatedApplication, application.user, application.loan);
             }
         } catch (emailErr) {
             console.error('Email notification failed:', emailErr.message);
@@ -208,13 +207,15 @@ router.put('/leads/:id/review', protect, async (req, res) => {
 
         // Update agent stats
         if (action === 'approve') {
-            await AgentProfile.findOneAndUpdate(
-                { user: req.user._id },
-                { $inc: { leadsApproved: 1 } }
-            );
+            try {
+                await prisma.agentProfile.update({
+                    where: { userId: req.user.id },
+                    data: { leadsApproved: { increment: 1 } }
+                });
+            } catch (ignore) {} // ignore if agent profile doesn't exist for some reason
         }
 
-        res.json({ message: `Application ${application.status} successfully`, application });
+        res.json({ message: `Application ${updatedApplication.status} successfully`, application: updatedApplication });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -228,13 +229,12 @@ router.post('/leads/:id/analyze-documents', protect, async (req, res) => {
         if (req.user.role !== 'agent' && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Access denied. Agent or Admin role required.' });
         }
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ message: 'Invalid Application ID format' });
-        }
-
-        const application = await LoanApplication.findById(req.params.id)
-            .populate('user', 'name email phone')
-            .populate('loan', 'name loanType');
+        const aadhaarService = require('../services/aadhaarService');
+        
+        const application = await prisma.loanApplication.findUnique({
+            where: { id: req.params.id },
+            include: { user: true, loan: true }
+        });
 
         if (!application) {
             return res.status(404).json({ message: 'Application not found' });
@@ -293,43 +293,73 @@ OUTPUT (JSON ONLY):
         });
 
         let aiResponse = chatCompletion.choices[0].message.content.trim();
-
-        // Basic JSON cleaning if necessary (some models still add ```json)
         aiResponse = aiResponse.replace(/^```json/, '').replace(/```$/, '').trim();
 
         let parsedResponse;
         try {
             parsedResponse = JSON.parse(aiResponse);
+            if (parsedResponse.verdict) {
+                parsedResponse.verdict = parsedResponse.verdict.toLowerCase().trim();
+            }
+            const validVerdicts = ['genuine', 'suspicious', 'inconclusive'];
+            if (!validVerdicts.includes(parsedResponse.verdict)) {
+                parsedResponse.verdict = 'inconclusive';
+            }
         } catch (e) {
             console.error('AI JSON Parse Error, falling back to string search:', e.message);
-            // Fallback parsing if JSON fails
+            const content = aiResponse.toLowerCase();
             parsedResponse = {
-                verdict: aiResponse.toLowerCase().includes('suspicious') ? 'suspicious' :
-                    aiResponse.toLowerCase().includes('genuine') ? 'genuine' : 'inconclusive',
+                verdict: content.includes('suspicious') ? 'suspicious' :
+                    content.includes('genuine') ? 'genuine' : 'inconclusive',
                 details: aiResponse,
                 risk_score: 5
             };
         }
 
-        application.documentAnalysis = {
-            isAnalyzed: true,
-            analysisResult: parsedResponse.verdict,
-            analysisDetails: parsedResponse.calculations ?
-                `CALCULATIONS: ${parsedResponse.calculations}\n\nLOGIC CHECK: ${parsedResponse.logic_verification}\n\nSUMMARY: ${parsedResponse.details}` :
-                parsedResponse.details,
-            analyzedAt: new Date()
-        };
+        // --- Aadhaar Verification ---
+        let aadharRes = null;
+        let updateData = {};
+        if (application.aadharNumber) {
+            try {
+                aadharRes = await aadhaarService.verifyName(application.aadharNumber, application.user?.name || '');
+                updateData.aadharVerified = aadharRes.isVerified || false;
+                updateData.aadharNameMatch = aadharRes.nameMatchStatus;
+                updateData.aadharScore = aadharRes.confidenceScore;
+                updateData.aadharVerifiedAt = new Date();
+            } catch (aadharErr) {
+                console.error('Aadhaar service failed:', aadharErr.message);
+            }
+        }
 
-        await application.save();
+        updateData.docAnalyzed = true;
+        updateData.docAnalysisResult = parsedResponse.verdict;
+        updateData.docAnalysisDetails = parsedResponse.calculations ?
+            `CALCULATIONS: ${parsedResponse.calculations}\n\nLOGIC CHECK: ${parsedResponse.logic_verification}\n\nSUMMARY: ${parsedResponse.details || parsedResponse.reasoning || ''}` :
+            parsedResponse.details || 'Analysis completed.';
+        updateData.docAnalyzedAt = new Date();
+
+        const updatedApplication = await prisma.loanApplication.update({
+            where: { id: application.id },
+            data: updateData
+        });
 
         res.json({
-            verdict: parsedResponse.verdict,
-            details: application.documentAnalysis.analysisDetails,
-            analyzedAt: application.documentAnalysis.analyzedAt
+            verdict: updatedApplication.docAnalysisResult,
+            details: updatedApplication.docAnalysisDetails,
+            analyzedAt: updatedApplication.docAnalyzedAt,
+            aadharVerification: {
+                isVerified: updatedApplication.aadharVerified,
+                nameMatchStatus: updatedApplication.aadharNameMatch,
+                confidenceScore: updatedApplication.aadharScore,
+                verifiedAt: updatedApplication.aadharVerifiedAt
+            }
         });
     } catch (error) {
-        console.error('Document analysis error:', error.message);
-        res.status(500).json({ message: error.message });
+        console.error('Document analysis error:', error);
+        res.status(500).json({
+            message: `Analysis failed: ${error.message}`,
+            details: error.stack
+        });
     }
 });
 

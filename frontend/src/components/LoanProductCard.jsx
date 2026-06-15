@@ -18,9 +18,10 @@ const LoanProductCard = ({ loan, onCheckEligibility }) => {
     return (
         <Card elevation={0} sx={{
             borderRadius: 4,
-            border: '1px solid #edf2f7',
+            border: '1px solid',
+            borderColor: 'divider',
             transition: 'all 0.3s ease',
-            '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 20px -5px rgba(0, 0, 0, 0.08)' }
+            '&:hover': { transform: 'translateY(-4px)', boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 12px 20px -5px rgba(0, 0, 0, 0.5)' : '0 12px 20px -5px rgba(0, 0, 0, 0.08)' }
         }}>
             <CardContent sx={{ p: 3 }}>
                 <Stack direction="row" spacing={2} sx={{ mb: 2 }} alignItems="center">
@@ -32,7 +33,7 @@ const LoanProductCard = ({ loan, onCheckEligibility }) => {
                         {getLoanIcon(loan.loanType)}
                     </Box>
                     <Box>
-                        <Typography variant="h6" fontWeight="700" sx={{ lineHeight: 1.2 }}>
+                        <Typography variant="h6" fontWeight="700" sx={{ lineHeight: 1.2, color: 'text.primary' }}>
                             {loan.name[lang] || loan.name.en}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" fontWeight="600" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -48,7 +49,7 @@ const LoanProductCard = ({ loan, onCheckEligibility }) => {
                 <Stack direction="row" spacing={3} sx={{ mb: 3 }}>
                     <Box>
                         <Typography variant="caption" color="text.secondary" display="block">{t('loan.interest_rate_title')}</Typography>
-                        <Typography variant="subtitle1" fontWeight="700" color="primary.main">
+                        <Typography variant="subtitle1" fontWeight="700" color="primary.light">
                             {loan.interestRate.min}% - {loan.interestRate.max}%
                         </Typography>
                     </Box>

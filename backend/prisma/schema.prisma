@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  borrower
+  agent
+  admin
+}
+
+enum LanguagePreference {
+  en
+  hi
+  ta
+}
+
+enum EmploymentStatus {
+  employed
+  self_employed
+  unemployed
+  student
+  retired
+}
+
+enum SchemeCategory {
+  msme
+  business
+  agriculture
+  education
+  social_welfare
+  street_vendor
+  housing
+}
+
+enum LoanType {
+  personal
+  home
+  education
+  business
+  vehicle
+  gold
+  lap
+  agricultural
+  mortgage
+}
+
+enum ApplicationStatus {
+  draft
+  submitted
+  under_review
+  approved
+  rejected
+  disbursed
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+}
+
+model User {
+  id                 String             @id @default(uuid())
+  name               String
+  email              String             @unique
+  password           String
+  phone              String
+  languagePreference LanguagePreference @default(en)
+  role               Role               @default(borrower)
+  aadharNumber       String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  // Profile data
+  monthlyIncome      Float?             @default(0)
+  employmentStatus   EmploymentStatus?  @default(employed)
+  creditScore        Int?               @default(650)
+  existingLoans      Int?               @default(0)
+  age                Int?
+
+  // Relations
+  loanApplications   LoanApplication[]  @relation("UserApplications")
+  reviewedApps       LoanApplication[]  @relation("ReviewedApplications")
+  agentApplications  LoanApplication[]  @relation("AgentApplications")
+  agentProfile       AgentProfile?
+  conversations      Conversation[]
+}
+
+model AgentProfile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agencyName          String
+  licenseNumber       String   @unique
+  experience          Int
+  specializations     String[] // Stored as array of strings
+  verified            Boolean  @default(false)
+  commissionRate      Float    @default(0)
+  performanceRating   Float    @default(5)
+  totalLeadsSubmitted Int      @default(0)
+  leadsApproved       Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Loan {
+  id                 String   @id @default(uuid())
+  loanType           LoanType
+  nameEn             String
+  nameHi             String
+  nameTa             String
+  descEn             String
+  descHi             String
+  descTa             String
+  interestRateMin    Float
+  interestRateMax    Float
+  loanAmountMin      Float
+  loanAmountMax      Float
+  tenureMin          Int
+  tenureMax          Int
+  minAge             Int      @default(18)
+  maxAge             Int      @default(65)
+  minIncome          Float
+  minCreditScore     Int      @default(650)
+  employmentRequired Boolean  @default(true)
+  maxExistingLoans   Int      @default(3)
+  requiredDocsEn     String[]
+  requiredDocsHi     String[]
+  requiredDocsTa     String[]
+  featuresEn         String[]
+  featuresHi         String[]
+  featuresTa         String[]
+  processingFee      Float    @default(0)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  applications       LoanApplication[]
+  conversations      Conversation[]    @relation("ConversationLoans")
+}
+
+model Scheme {
+  id                 String         @id @default(uuid())
+  nameEn             String
+  nameHi             String
+  nameTa             String
+  descEn             String
+  descHi             String
+  descTa             String
+  benefitEn          String
+  benefitHi          String
+  benefitTa          String
+  minAge             Int            @default(18)
+  maxAge             Int            @default(70)
+  targetAudienceEn   String?
+  targetAudienceHi   String?
+  targetAudienceTa   String?
+  maxIncome          Float?
+  portalUrl          String?
+  category           SchemeCategory
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model LoanApplication {
+  id                 String            @id @default(uuid())
+  userId             String
+  user               User              @relation("UserApplications", fields: [userId], references: [id], onDelete: Cascade)
+  loanId             String
+  loan               Loan              @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  agentId            String?
+  agent              User?             @relation("AgentApplications", fields: [agentId], references: [id])
+  isAgentSubmission  Boolean           @default(false)
+  
+  requestedAmount    Float
+  requestedTenure    Int
+  purpose            String?
+  borrowerAge        Int?
+  monthlyIncome      Float?
+  creditScore        Int?
+  hasCollateral      Boolean           @default(false)
+  collateralDetails  String?
+  aadharNumber       String?
+  
+  // Verification
+  aadharVerified     Boolean           @default(false)
+  aadharNameMatch    String?
+  aadharScore        Float?
+  aadharVerifiedAt   DateTime?
+  identityVerified   Boolean           @default(false)
+  addressVerified    Boolean           @default(false)
+  incomeVerified     Boolean           @default(false)
+  
+  status             ApplicationStatus @default(draft)
+  
+  // JSON field for documents and remarks to keep it simple, or separate models
+  documents          Json?             // Array of { type, name, path, uploadedAt }
+  remarks            Json?             // Array of { message, createdBy, createdAt }
+  
+  eligibilityScore       Float?
+  ageEligible            Boolean?
+  incomeEligible         Boolean?
+  creditScoreEligible    Boolean?
+  employmentEligible     Boolean?
+  existingLoansEligible  Boolean?
+
+  docAnalyzed        Boolean           @default(false)
+  docAnalysisResult  String?
+  docAnalysisDetails String?
+  docAnalyzedAt      DateTime?
+
+  reviewedById       String?
+  reviewedBy         User?             @relation("ReviewedApplications", fields: [reviewedById], references: [id])
+  reviewedAt         DateTime?
+  rejectionReason    String?
+  approvedAmount     Float?
+  approvedTenure     Int?
+  interestRate       Float?
+  disbursementDate   DateTime?
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+model Conversation {
+  id                 String             @id @default(uuid())
+  userId             String
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language           LanguagePreference @default(en)
+  
+  // Messages stored as JSON array to avoid a separate table if it's strictly ordered document
+  messages           Json               @default("[]") // Array of { role, content, timestamp, isVoice }
+  
+  currentIntent      String?
+  userQueries        String[]
+  
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  discussedLoans     Loan[]             @relation("ConversationLoans")
+}

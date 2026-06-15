@@ -193,7 +193,7 @@ const AgentDashboard = () => {
             {/* Header */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
                 <Box>
-                    <Typography variant="h4" fontWeight="800" color="primary.dark">
+                    <Typography variant="h4" fontWeight="800" color="text.primary">
                         {user?.role === 'admin' ? 'Admin Portal' : 'Agent Portal'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -219,7 +219,12 @@ const AgentDashboard = () => {
                     { label: 'Conversion Rate', value: `${data?.stats?.totalLeads ? Math.round((data.stats.approvedLeads / data.stats.totalLeads) * 100) : 0}%`, icon: <TrendingUp size={28} />, color: '#7b1fa2' }
                 ].map((stat, i) => (
                     <Grid size={{ xs: 6, md: 3 }} key={i}>
-                        <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #edf2f7', bgcolor: 'white' }}>
+                        <Card elevation={0} sx={{
+                            borderRadius: 4,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            bgcolor: 'background.paper'
+                        }}>
                             <CardContent sx={{ p: 2.5 }}>
                                 <Stack direction="row" spacing={2} alignItems="center">
                                     <Box sx={{
@@ -230,7 +235,7 @@ const AgentDashboard = () => {
                                     </Box>
                                     <Box>
                                         <Typography variant="caption" color="text.secondary" fontWeight="600">{stat.label}</Typography>
-                                        <Typography variant="h5" fontWeight="800" sx={{ color: '#2d3748' }}>{stat.value}</Typography>
+                                        <Typography variant="h5" fontWeight="800" color="text.primary">{stat.value}</Typography>
                                     </Box>
                                 </Stack>
                             </CardContent>
@@ -255,17 +260,17 @@ const AgentDashboard = () => {
                 </FormControl>
             </Stack>
 
-            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #edf2f7', overflow: 'hidden' }}>
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
                 <Table>
                     <TableHead>
-                        <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748b' }}>Borrower</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748b' }}>Loan Type</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748b' }}>Amount</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748b' }}>Documents</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748b' }}>AI Analysis</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: '#64748b' }}>Status</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 700, color: '#64748b' }}>Actions</TableCell>
+                        <TableRow sx={{ bgcolor: 'action.hover' }}>
+                            <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Borrower</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Loan Type</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Amount</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Documents</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>AI Verification</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Status</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 700, color: 'text.secondary' }}>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -309,7 +314,7 @@ const AgentDashboard = () => {
                                                 variant="outlined"
                                             />
                                         ) : (
-                                            <Typography variant="caption" color="text.secondary">Not analyzed</Typography>
+                                            <Typography variant="caption" color="text.secondary">Not verified</Typography>
                                         )}
                                     </TableCell>
                                     <TableCell>
@@ -461,9 +466,9 @@ const AgentDashboard = () => {
                                     <Alert severity="warning" sx={{ mb: 3 }}>No documents uploaded for this application</Alert>
                                 )}
 
-                                {/* AI Document Analysis */}
+                                {/* AI Document Verification */}
                                 <Typography variant="subtitle2" fontWeight="700" color="text.secondary" sx={{ mb: 1.5 }}>
-                                    AI DOCUMENT ANALYSIS
+                                    AI DOCUMENT VERIFICATION
                                 </Typography>
                                 {leadDetail.documentAnalysis?.isAnalyzed ? (
                                     <Paper variant="outlined" sx={{
@@ -495,13 +500,45 @@ const AgentDashboard = () => {
                                             disabled={analyzing || !leadDetail.documents?.length}
                                             sx={{ borderRadius: 2 }}
                                         >
-                                            {analyzing ? 'Analyzing...' : 'Run AI Analysis'}
+                                            {analyzing ? 'Verifying Documents...' : 'Verify Documents with AI'}
                                         </Button>
                                         {!leadDetail.documents?.length && (
                                             <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                                                No documents to analyze
+                                                No documents to verify
                                             </Typography>
                                         )}
+                                    </Box>
+                                )}
+
+                                {/* Aadhaar Verification Results */}
+                                {leadDetail.aadharNumber && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="subtitle2" fontWeight="700" color="text.secondary" sx={{ mb: 1.5 }}>
+                                            AADHAAR VERIFICATION
+                                        </Typography>
+                                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: 'action.hover' }}>
+                                            <Stack direction="row" spacing={2} alignItems="center">
+                                                <Typography variant="body2" color="text.secondary">Number:</Typography>
+                                                <Typography variant="body2" fontWeight="700">{leadDetail.aadharNumber}</Typography>
+                                            </Stack>
+                                            {leadDetail.aadharVerification?.isVerified ? (
+                                                <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 1 }}>
+                                                    <Typography variant="body2" color="text.secondary">Name Match:</Typography>
+                                                    <Chip
+                                                        label={leadDetail.aadharVerification.nameMatchStatus?.toUpperCase() || 'UNKNOWN'}
+                                                        size="small"
+                                                        color={leadDetail.aadharVerification.nameMatchStatus === 'match' ? 'success' : 'error'}
+                                                    />
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        Score: {leadDetail.aadharVerification.confidenceScore}%
+                                                    </Typography>
+                                                </Stack>
+                                            ) : (
+                                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                                    Not yet verified. Run "Verify Documents" to trigger Aadhaar check.
+                                                </Typography>
+                                            )}
+                                        </Paper>
                                     </Box>
                                 )}
 
@@ -644,7 +681,7 @@ const AgentDashboard = () => {
                     </form>
                 </Paper>
             </Modal>
-        </Container>
+        </Container >
     );
 };
 

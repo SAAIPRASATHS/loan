@@ -36,7 +36,8 @@ const ApplyLoan = () => {
             identityVerified: false,
             addressVerified: false,
             incomeVerified: false
-        }
+        },
+        aadharNumber: ''
     });
 
     const [files, setFiles] = useState({
@@ -143,6 +144,15 @@ const ApplyLoan = () => {
                                 fullWidth label={t('apply.age')} type="number"
                                 value={formData.borrowerAge}
                                 onChange={(e) => setFormData({ ...formData, borrowerAge: e.target.value })}
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                            <TextField
+                                fullWidth label="Aadhaar Number" type="text"
+                                value={formData.aadharNumber}
+                                onChange={(e) => setFormData({ ...formData, aadharNumber: e.target.value.replace(/\D/g, '').slice(0, 12) })}
+                                inputProps={{ maxLength: 12 }}
+                                helperText="12-digit Aadhaar Number"
                             />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
@@ -253,7 +263,7 @@ const ApplyLoan = () => {
 
     return (
         <Container maxWidth="sm" sx={{ py: 6 }}>
-            <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid #edf2f7' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="h4" fontWeight="800" align="center" gutterBottom color="primary">
                     {t('apply.title')}
                 </Typography>

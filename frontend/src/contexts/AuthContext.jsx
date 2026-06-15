@@ -7,21 +7,31 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+        console.log('[AUTH CONTEXT] Initializing, checking sessionStorage');
+        const userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+        console.log('[AUTH CONTEXT] User from sessionStorage:', userInfo);
         if (userInfo) {
             setUser(userInfo);
+            console.log('[AUTH CONTEXT] User loaded:', userInfo.email, 'Role:', userInfo.role);
+        } else {
+            console.log('[AUTH CONTEXT] No user in sessionStorage');
         }
         setLoading(false);
+        console.log('[AUTH CONTEXT] Initialization complete');
     }, []);
 
     const login = (userData) => {
-        localStorage.setItem('userInfo', JSON.stringify(userData));
+        console.log('[AUTH CONTEXT] Login called with:', userData);
+        sessionStorage.setItem('userInfo', JSON.stringify(userData));
         setUser(userData);
+        console.log('[AUTH CONTEXT] User logged in:', userData.email, 'Role:', userData.role);
     };
 
     const logout = () => {
-        localStorage.removeItem('userInfo');
+        console.log('[AUTH CONTEXT] Logout called');
+        sessionStorage.removeItem('userInfo');
         setUser(null);
+        console.log('[AUTH CONTEXT] User logged out');
     };
 
     return (

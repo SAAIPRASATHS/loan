@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './i18n/config';
@@ -17,50 +17,30 @@ import ApplyLoan from './pages/ApplyLoan';
 import EMICalculator from './pages/EMICalculator';
 import LoanComparison from './pages/LoanComparison';
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1a237e',
-      light: '#534bae',
-      dark: '#000051',
-    },
-    secondary: {
-      main: '#c2185b',
-      light: '#fa5788',
-      dark: '#8c0032',
-    },
-    background: {
-      default: '#f5f5f5',
-    },
-  },
-  typography: {
-    fontFamily: '"Outfit", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          textTransform: 'none',
-          fontWeight: 600,
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          borderRadius: 16,
-        },
-      },
-    },
-  },
-});
-
 const PrivateRoute = ({ children, roles }) => {
   const { user, loading } = useAuth();
-  if (loading) return null;
-  if (!user) return <Navigate to="/login" />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" />;
+
+  console.log('[PRIVATE ROUTE] User:', user);
+  console.log('[PRIVATE ROUTE] Loading:', loading);
+  console.log('[PRIVATE ROUTE] Required roles:', roles);
+  console.log('[PRIVATE ROUTE] User role:', user?.role);
+
+  if (loading) {
+    console.log('[PRIVATE ROUTE] Still loading');
+    return null;
+  }
+
+  if (!user) {
+    console.log('[PRIVATE ROUTE] No user, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
+
+  if (roles && !roles.includes(user.role)) {
+    console.log('[PRIVATE ROUTE] Role mismatch, redirecting to /dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  console.log('[PRIVATE ROUTE] Access granted');
   return children;
 };
 
@@ -125,7 +105,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider>
       <CssBaseline />
       <AuthProvider>
         <LanguageProvider>
@@ -142,8 +122,28 @@ function App() {
 }
 
 function DashboardRedirect() {
-  const { user } = useAuth();
-  if (user?.role === 'agent' || user?.role === 'admin') return <Navigate to="/agent/dashboard" />;
+  const { user, loading } = useAuth();
+
+  console.log('[DASHBOARD REDIRECT] User:', user);
+  console.log('[DASHBOARD REDIRECT] Loading:', loading);
+  console.log('[DASHBOARD REDIRECT] Role:', user?.role);
+
+  if (loading) {
+    console.log('[DASHBOARD REDIRECT] Still loading, showing nothing');
+    return null;
+  }
+
+  if (!user) {
+    console.log('[DASHBOARD REDIRECT] No user, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role === 'agent' || user.role === 'admin') {
+    console.log('[DASHBOARD REDIRECT] Agent/Admin detected, redirecting to /agent/dashboard');
+    return <Navigate to="/agent/dashboard" replace />;
+  }
+
+  console.log('[DASHBOARD REDIRECT] Borrower detected, showing Dashboard');
   return <Dashboard />;
 }
 

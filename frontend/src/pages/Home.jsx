@@ -6,11 +6,18 @@ import { MessageSquare, ShieldCheck, BookOpen, Mic } from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const FeatureCard = ({ icon: Icon, title, description }) => (
-    <Paper elevation={0} sx={{ p: 4, textAlign: 'center', bgcolor: 'white', border: '1px solid #eee', height: '100%' }}>
+    <Paper elevation={0} sx={{
+        p: 4,
+        textAlign: 'center',
+        bgcolor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
+        height: '100%'
+    }}>
         <Box sx={{ display: 'inline-flex', p: 2, borderRadius: 4, bgcolor: 'primary.light', mb: 2, color: 'white' }}>
             <Icon size={32} />
         </Box>
-        <Typography variant="h6" gutterBottom fontWeight="700">
+        <Typography variant="h6" gutterBottom fontWeight="700" color="text.primary">
             {title}
         </Typography>
         <Typography variant="body2" color="text.secondary">
@@ -23,7 +30,7 @@ const Home = () => {
     const { t } = useTranslation();
 
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: '#f8fafc' }}>
+        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
             {/* Hero Section */}
             <Box sx={{ py: 12, background: 'linear-gradient(135deg, #1a237e 0%, #311b92 100%)', color: 'white' }}>
                 <Container maxWidth="md" sx={{ textAlign: 'center' }}>
@@ -49,7 +56,12 @@ const Home = () => {
                             to="/agent/login"
                             variant="contained"
                             size="large"
-                            sx={{ px: 4, py: 1.5, fontSize: '1rem', borderRadius: 3, bgcolor: 'white', color: 'primary.main', '&:hover': { bgcolor: '#f0f0f0' } }}
+                            sx={{
+                                px: 4, py: 1.5, fontSize: '1rem', borderRadius: 3,
+                                bgcolor: 'background.paper',
+                                color: 'primary.main',
+                                '&:hover': { bgcolor: 'action.hover' }
+                            }}
                         >
                             {t('home.agent_login')}
                         </Button>

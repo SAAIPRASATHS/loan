@@ -122,8 +122,15 @@ const Dashboard = () => {
                         {loading ? (
                             [1, 2].map(i => <Skeleton key={i} variant="rectangular" height={120} sx={{ borderRadius: 4 }} />)
                         ) : applications.length === 0 ? (
-                            <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '2px dashed #e0e0e0', bgcolor: 'rgba(255,255,255,0.5)' }}>
-                                <FileText size={48} style={{ opacity: 0.1, marginBottom: 16 }} />
+                            <Paper sx={{
+                                p: 6,
+                                textAlign: 'center',
+                                borderRadius: 4,
+                                border: '2px dashed',
+                                borderColor: 'divider',
+                                bgcolor: 'action.hover'
+                            }}>
+                                <FileText size={48} style={{ opacity: 0.2, marginBottom: 16 }} />
                                 <Typography variant="h6" color="text.secondary">{t('dashboard.no_applications')}</Typography>
                                 <Typography variant="body2" color="text.secondary">{t('dashboard.start_chat_hint')}</Typography>
                             </Paper>
@@ -131,20 +138,21 @@ const Dashboard = () => {
                             applications.map(app => (
                                 <Card key={app._id} elevation={0} sx={{
                                     borderRadius: 4,
-                                    border: '1px solid #edf2f7',
+                                    border: '1px solid',
+                                    borderColor: 'divider',
                                     transition: 'all 0.3s ease',
-                                    '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 20px -5px rgba(0, 0, 0, 0.08)' }
+                                    '&:hover': { transform: 'translateY(-4px)', boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 12px 20px -5px rgba(0, 0, 0, 0.5)' : '0 12px 20px -5px rgba(0, 0, 0, 0.08)' }
                                 }}>
                                     <CardContent sx={{ p: 3 }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                                            <Typography variant="h6" fontWeight="700" color="primary.dark">
+                                            <Typography variant="h6" fontWeight="700" color="text.primary">
                                                 {app.loan?.name?.[i18n.language] || app.loan?.name?.en || 'N/A'}
                                             </Typography>
                                             {getStatusChip(app.status)}
                                         </Box>
 
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                                            <Typography variant="body2" fontWeight="600" sx={{ px: 1.5, py: 0.5, bgcolor: '#f1f5f9', borderRadius: 1.5 }}>
+                                            <Typography variant="body2" fontWeight="600" sx={{ px: 1.5, py: 0.5, bgcolor: 'action.selected', borderRadius: 1.5 }}>
                                                 ₹{app.requestedAmount.toLocaleString()}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
@@ -214,7 +222,13 @@ const Dashboard = () => {
                                     { title: t('dashboard.tip2_title'), desc: t('dashboard.tip2_desc') },
                                     { title: t('dashboard.tip3_title'), desc: t('dashboard.tip3_desc') }
                                 ].map((tip, i) => (
-                                    <Paper key={i} sx={{ p: 2, borderRadius: 3, bgcolor: '#f8fafd', border: '1px solid #edf2f7' }}>
+                                    <Paper key={i} sx={{
+                                        p: 2,
+                                        borderRadius: 3,
+                                        bgcolor: 'background.paper',
+                                        border: '1px solid',
+                                        borderColor: 'divider'
+                                    }}>
                                         <Typography variant="subtitle2" fontWeight={700} gutterBottom>{tip.title}</Typography>
                                         <Typography variant="body2" color="text.secondary">{tip.desc}</Typography>
                                     </Paper>
