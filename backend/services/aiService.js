@@ -4,8 +4,19 @@ const Backend = require('i18next-fs-backend');
 const path = require('path');
 const Groq = require('groq-sdk');
 let groq;
-if (process.env.GROQ_API_KEY) {
-    groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+function getGroqClient() {
+    if (!groq && process.env.GROQ_API_KEY) {
+        console.log('[AI_SERVICE] Initializing Groq client with provided API key...');
+        groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    }
+    
+    if (!groq) {
+        console.error('[AI_SERVICE] CRITICAL ERROR: process.env.GROQ_API_KEY is missing!');
+        throw new Error('AI Service not configured');
+    }
+    
+    return groq;
 }
 
 const prisma = require('../prisma/client');
@@ -89,9 +100,9 @@ class AIService {
             { role: "user", content: text }
         ];
 
-        if (!groq) throw new Error('AI Service not configured');
+        const client = getGroqClient();
 
-        const chatCompletion = await groq.chat.completions.create({
+        const chatCompletion = await client.chat.completions.create({
             messages: messages,
             model: model,
             temperature: 0,
@@ -106,8 +117,8 @@ class AIService {
     }
 
     async translateText(text, targetLang) {
-        if (!groq) throw new Error('AI Service not configured');
-        const chatCompletion = await groq.chat.completions.create({
+        const client = getGroqClient();
+        const chatCompletion = await client.chat.completions.create({
             messages: [
                 { role: "system", content: "Translate the following text. Return ONLY the translation." },
                 { role: "user", content: `Translate to ${targetLang}: ${text}` }
